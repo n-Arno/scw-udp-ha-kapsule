@@ -1,0 +1,142 @@
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  labels:
+    app: udpserver
+  name: udpserver
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: udpserver
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: udpserver
+  labels:
+    app: udpserver
+spec:
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+  replicas: 2
+  selector:
+    matchLabels:
+      app: udpserver
+  template:
+    metadata:
+      labels:
+        app: udpserver
+    spec:
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: DoNotSchedule
+        labelSelector:
+          matchLabels:
+            app: udpserver
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: "node.kubernetes.io/role"
+                operator: In
+                values:
+                - udp
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - udpserver
+            topologyKey: "kubernetes.io/hostname"
+      terminationGracePeriodSeconds: 120 
+      containers:
+      - name: udpserver
+        image: ghcr.io/n-arno/scw-udp-ha-kapsule-udpserver:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 1053
+          hostPort: 1053
+          protocol: UDP
+        lifecycle:
+          preStop:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - sleep 180 
+      tolerations:
+      - key: "node.kubernetes.io/role"
+        operator: "Equal"
+        value: "udp"
+        effect: "NoSchedule"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: logs
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: "sbs-15k"
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: logserver
+  name: logserver
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: logserver
+  template:
+    metadata:
+      labels:
+        app: logserver
+    spec:
+      containers:
+      - image: ghcr.io/n-arno/scw-udp-ha-kapsule-logserver:latest
+        imagePullPolicy: Always
+        name: logserver
+        volumeMounts:
+        - mountPath: "/out"
+          name: logs
+      volumes:
+      - name: logs
+        persistentVolumeClaim:
+          claimName: logs
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: "log.kube.arno-scw.fr."
+    external-dns.alpha.kubernetes.io/ttl: "1m"
+    service.beta.kubernetes.io/scw-loadbalancer-type: "LB-S"
+  labels:
+    external-dns.alpha.kubernetes.io/publish: "true"
+    app: logserver
+  name: log
+spec:
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: 80
+  selector:
+    app: logserver
+  type: LoadBalancer
+

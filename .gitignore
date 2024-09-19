@@ -1,0 +1,8 @@
+.terraform
+terraform.tfstate
+terraform.tfstate.backup
+client/client
+client/client-*
+servers/udp/udp
+servers/log/log
+kubeconfig.yaml
