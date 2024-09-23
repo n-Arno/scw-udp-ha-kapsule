@@ -63,6 +63,7 @@ resource "scaleway_k8s_cluster" "kapsule" {
     estimator                        = "binpacking"
     expander                         = "random"
     ignore_daemonsets_utilization    = true
+    balance_similar_node_groups      = true
   }
 }
 
