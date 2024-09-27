@@ -135,4 +135,7 @@ The udp server is running only on the dedicated udp nodes using hostPort and the
 
 The log server is running only on the application nodes with no public IP and accessed via a LoadBalancer service, connected to only those nodes via VPC as backend.
 
+architecture
+============
 
+![architecture](images/ha-udp-k8s.png)
