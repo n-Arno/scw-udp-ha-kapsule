@@ -12,18 +12,16 @@ spec:
       app: udpserver
 ---
 apiVersion: apps/v1
-kind: Deployment
+kind: DaemonSet
 metadata:
   name: udpserver
   labels:
     app: udpserver
 spec:
-  strategy:
+  updateStrategy:
     type: RollingUpdate
     rollingUpdate:
-      maxSurge: 0
       maxUnavailable: 1
-  replicas: 2
   selector:
     matchLabels:
       app: udpserver
@@ -32,31 +30,8 @@ spec:
       labels:
         app: udpserver
     spec:
-      topologySpreadConstraints:
-      - maxSkew: 1
-        topologyKey: topology.kubernetes.io/zone
-        whenUnsatisfiable: DoNotSchedule
-        labelSelector:
-          matchLabels:
-            app: udpserver
-      affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-            - matchExpressions:
-              - key: "node.kubernetes.io/role"
-                operator: In
-                values:
-                - udp
-        podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-          - labelSelector:
-              matchExpressions:
-              - key: app
-                operator: In
-                values:
-                - udpserver
-            topologyKey: "kubernetes.io/hostname"
+      nodeSelector:
+        node.kubernetes.io/role: udp
       terminationGracePeriodSeconds: 120 
       containers:
       - name: udpserver
